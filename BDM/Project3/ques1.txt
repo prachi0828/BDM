@@ -1,0 +1,42 @@
+bin/spark-shell --packages com.databricks:spark-csv_2.10:1.3.0
+
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+
+val transaction=sqlContext.read.format("com.databricks.spark.csv").option("header","true").option("inferSchema","true").load("transaction.csv")
+
+transaction.registerTempTable("transactions")
+
+transaction.printSchema
+
+//1
+val t1=transaction.filter(transaction("_c2")>200)
+t1.show()
+
+//2
+val gbResult=t1.groupBy(t1("_c3")).agg(sum("_c2"),min("_c2"),max("_c2"),avg("_c2"))
+
+//3
+gbResult.show()
+
+
+//4
+val t3=t1.groupBy(t1("_c1")).count().withColumnRenamed("count","t3count")
+t3.show()
+
+
+//5
+val t4=transaction.filter(transaction("_c2")>600)
+t4.show()
+
+//6
+val t5=t4.groupBy(t4("_c1")).count().withColumnRenamed("count","t5count")
+t5.show()
+
+//7
+val t5temp= t5.select($"_c1",(($"t5count")*3).alias("t5newcount"))
+val tempjoin= t5temp.join(t3, "_c1")
+val t6temp= tempjoin.filter($"t5newcount"< $"t3count")
+val t6= t6temp.select("_c1")
+
+//8
+t6.show()

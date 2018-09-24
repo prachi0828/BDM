@@ -1,0 +1,125 @@
+//Step1- Generate dataset
+import java.io._
+val count= 1000000
+val min = 1
+val max = 10000
+val writer = new PrintWriter(new File("points.csv"))
+for (_ <- 1 to count) {
+    val x = scala.util.Random.nextInt(max - min) + min
+    val y = scala.util.Random.nextInt(max - min) + min
+    writer.println(s"$x,$y")
+}
+writer.close
+hadoop fs -put points.csv /home/hadoop/input
+//Step2
+val coord = sc.textFile("points.csv")
+case class class1(Index: Int, Count: Int)
+
+
+val data1=coord.map{t=>
+ val p=t.split(",")
+ val xmod=p(0).trim.toInt/20
+ val ymod=p(1).trim.toInt/20
+ val index=((500-ymod)*500) + xmod
+ (index,1)
+}
+
+val reddata=data1.reduceByKey(_+_).map{case(w,k)=>(w,k)}
+reddata.toDF().show()
+
+// Step 2
+
+val calcNew=udf((r:Int)=>{
+if(r==1) (r+1).toString.concat(",").concat((r+500).toString).concat(",").concat((r+501).toString) 
+else if(r==249501) (r-500).toString.concat(",").concat((r-499).toString).concat(",").concat((r+1).toString) 
+else if((r-1)%500==0) (r+1).toString.concat(",").concat((r+500).toString).concat(",").concat((r+501).toString).concat(",").concat((r-500).toString).concat(",").concat((r-499).toString) 
+else if(r==500) (r-1).toString.concat(",").concat((r+500).toString).concat(",").concat((r+499).toString) 
+else if(r==250000) (r-500).toString.concat(",").concat((r-501).toString).concat(",").concat((r-1).toString) 
+else if(r%500==0) (r-1).toString.concat(",").concat((r+500).toString).concat(",").concat((r+499).toString).concat(",").concat((r-500).toString).concat(",").concat((r-501).toString) 
+else if(r>1&&r<500) (r-1).toString.concat(",").concat((r+1).toString).concat(",").concat((r+499).toString).concat(",").concat((r+500).toString).concat(",").concat((r+501).toString) 
+else if(r>249501&&r<250000) (r-1).toString.concat(",").concat((r+1).toString).concat(",").concat((r-499).toString).concat(",").concat((r-500).toString).concat(",").concat((r-501).toString) 
+else (r-1).toString.concat(",").concat((r+1).toString).concat(",").concat((r+499).toString).concat(",").concat((r+500).toString).concat(",").concat((r+501).toString).concat(",").concat((r-499).toString).concat(",").concat((r-500).toString).concat(",").concat((r-501).toString)})
+
+val temp=finalDf.withColumn("Neighbors",calcNew(col("_1")))
+val finalDf=df.sort(asc("_1"))
+
+val listX= new ListBuffer[Int]()
+
+listX.foreach(t=>{val p = t.split(","); val sum=0 p.foreach(v=> temp.rdd.map{c=>if(c.getInt(0)==v) sum+=c.getInt(1)}) listY+=sum})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+val q=reddata.map(x=>x._1).collect
+
+val inds=reddata.map{
+p =>val s= if(p._1 == 1) {(p._1 + 1,1,p._2)(p._1 + 500,1,p._2)(p._1 + 501,1,p._2)} 
+
+else if(p._1==500){(p._1 - 1,1,p._2)(p._1 + 500,1,p._2)(p._1 + 499,1,p._2)}
+else{(p._1,0,p._2)}
+} 
+
+else if(p._1 == 249501) q.filter(x => x == (p._1 + 1) || x == (p._1 - 500) || x == (p._1 - 499)).length 
+
+else if(p._1 ==250000) q.filter(x => x == (p._1 - 1) || x == (p._1 - 500) || x == (p._1 - 501)).length 
+
+else if(p._1 >= 2 && p._1<=499) q.filter(x => x == (p._1 + 1) || x == (p._1 + 500) || x == (p._1 - 1)).length 
+
+else if(p._1 >=249502 && p._1<=250000) q.filter(x => x == (p._1 - 1) || x == (p._1 - 500) || x == (p._1 - 501)).length 
+
+else if(((p._1-1)%500)==0) q.filter(x => x == (p._1 + 1) || x == (p._1 + 500) || x == (p._1 - 500) || x == (p._1 - 499) || x == (p._1 + 501)).length 
+
+else if(((p._1)%500)==0) q.filter(x => x == (p._1 - 1) || x == (p._1 + 500) || x == (p._1 - 500) || x == (p._1 + 499) || x == (p._1 + 501)).length 
+
+else q.filter(x => x == (p._1 + 1) || x == (p._1 + 500) || x == (p._1 - 500) || x == (p._1 - 501) || x == (p._1 - 499) || x == (p._1 + 499) || x == (p._1 - 501)).length
+
+val count=q.filter(x => x==p._1).length
+val density=((count.toFloat)/s)
+(p._1, density)
+}
+
+
+val inds=reddata.map{
+val r1=if ((p._1 % 500) !=0){
+	p=>(p._1+1,1,p._2)	}
+       val r2= if ((p._1 - 1) % 500 !=0){
+	p=>(p._1-1,1,p._2) }
+       val r3= if (p._1 - 500 > 0) {
+            p=>(p._1-500,1,p._2) }
+      val r4=if (p._1 + 500 < 250000){
+            p=>(p._1+500,1,p._2) }
+        val r5=if((p._1 % 500) !=0 && (p._1 - 500 > 0)){
+            p=>(p._1-500 + 1,1,p._2) }
+        val r6=if ((p._1 - 500 > 0) && ((p._1 - 1) % 500 !=0)){
+            p=>(p._1-500-1,1,p._2) }
+        val r7=if ( (p._1 % 500 !=0) && (p._1 + 500 < 250000) ){
+            p=>(p._1+500 + 1,1,p._2) }
+        val r8=if (((p._1 - 1) % 500 !=0) && (p._1 + 500 < 250000)){
+		p=>(p._1 + 500 - 1,1,p._2) }
+}
